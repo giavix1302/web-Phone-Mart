@@ -6,7 +6,6 @@
 'use client';
 
 import { useProducts } from '@/hooks/use-products';
-import type { Product } from '@/types/api';
 
 export default function ProductList() {
   const { products, loading, error } = useProducts();
