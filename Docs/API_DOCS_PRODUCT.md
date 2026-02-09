@@ -33,7 +33,22 @@
 
 **Authentication:** Không cần
 
-**Request Parameters:** Không có
+**Query Parameters:**
+- `brandId` (long, optional): Lọc theo Brand ID
+- `categoryId` (long, optional): Lọc theo Category ID
+- `minPrice` (decimal, optional): Giá tối thiểu (>= 0)
+- `maxPrice` (decimal, optional): Giá tối đa (>= 0)
+- `sortBy` (string, optional): Sắp xếp theo field. Mặc định: `"createdAt"`
+  - Các giá trị hợp lệ: `"createdAt"`, `"price"`, `"name"`
+- `sortDir` (string, optional): Hướng sắp xếp. Mặc định: `"desc"`
+  - Các giá trị hợp lệ: `"asc"`, `"desc"`
+
+**Ví dụ Request:**
+```
+GET /api/products?brandId=4&categoryId=1&minPrice=15044245&maxPrice=31821531
+GET /api/products?brandId=1&sortBy=price&sortDir=asc
+GET /api/products?categoryId=2&minPrice=100000&maxPrice=500000
+```
 
 **Success Response (200):**
 ```json
@@ -78,6 +93,24 @@
           "specValue": "42"
         }
       ],
+      "images": [
+        {
+          "id": 1,
+          "productId": 1,
+          "imageUrl": "https://res.cloudinary.com/example/image/upload/v1234567890/product1.jpg",
+          "altText": "Nike Air Max 90 - Front view",
+          "isPrimary": true
+        },
+        {
+          "id": 2,
+          "productId": 1,
+          "imageUrl": "https://res.cloudinary.com/example/image/upload/v1234567890/product1-side.jpg",
+          "altText": "Nike Air Max 90 - Side view",
+          "isPrimary": false
+        }
+      ],
+      "averageRating": 4.5,
+      "totalReviews": 24,
       "createdAt": "2024-01-01T10:00:00Z"
     }
   ]
@@ -127,6 +160,24 @@
         "specValue": "Leather"
       }
     ],
+    "images": [
+      {
+        "id": 1,
+        "productId": 1,
+        "imageUrl": "https://res.cloudinary.com/example/image/upload/v1234567890/product1.jpg",
+        "altText": "Nike Air Max 90 - Front view",
+        "isPrimary": true
+      },
+      {
+        "id": 2,
+        "productId": 1,
+        "imageUrl": "https://res.cloudinary.com/example/image/upload/v1234567890/product1-side.jpg",
+        "altText": "Nike Air Max 90 - Side view",
+        "isPrimary": false
+      }
+    ],
+    "averageRating": 4.5,
+    "totalReviews": 24,
     "createdAt": "2024-01-01T10:00:00Z"
   }
 }
@@ -223,6 +274,9 @@ Content-Type: application/json
         "specValue": "Leather"
       }
     ],
+    "images": [],
+    "averageRating": 0,
+    "totalReviews": 0,
     "createdAt": "2024-01-01T10:00:00Z"
   }
 }
@@ -342,6 +396,17 @@ Content-Type: application/json
         "specValue": "Synthetic Leather"
       }
     ],
+    "images": [
+      {
+        "id": 3,
+        "productId": 1,
+        "imageUrl": "https://res.cloudinary.com/example/image/upload/v1234567890/product1-updated.jpg",
+        "altText": "Nike Air Max 90 Updated - Front view",
+        "isPrimary": true
+      }
+    ],
+    "averageRating": 4.5,
+    "totalReviews": 24,
     "createdAt": "2024-01-01T10:00:00Z"
   }
 }
@@ -399,6 +464,21 @@ Authorization: Bearer {accessToken}
 
 ---
 
+## Product Query DTO Structure
+
+```typescript
+interface ProductQueryDto {
+  brandId?: number;              // Lọc theo Brand ID
+  categoryId?: number;            // Lọc theo Category ID
+  minPrice?: number;             // Giá tối thiểu (>= 0)
+  maxPrice?: number;             // Giá tối đa (>= 0)
+  sortBy?: string;               // Sắp xếp theo: "createdAt" | "price" | "name" (mặc định: "createdAt")
+  sortDir?: string;              // Hướng sắp xếp: "asc" | "desc" (mặc định: "desc")
+}
+```
+
+---
+
 ## Product Response DTO Structure
 
 ```typescript
@@ -417,6 +497,9 @@ interface ProductResponseDto {
   brandName: string | null;      // Tên brand
   colors: ProductColorResponseDto[];  // Danh sách màu
   specifications: ProductSpecificationResponseDto[];  // Danh sách thông số kỹ thuật
+  images: ProductImageResponseDto[];  // Danh sách hình ảnh sản phẩm
+  averageRating: number;         // Điểm đánh giá trung bình (0-5, làm tròn 2 chữ số thập phân)
+  totalReviews: number;          // Tổng số lượng review
   createdAt: string;            // Ngày tạo (ISO 8601 format)
 }
 
@@ -431,6 +514,14 @@ interface ProductSpecificationResponseDto {
   specName: string;              // Tên thông số (ví dụ: "Material", "Size")
   specValue: string;            // Giá trị thông số (ví dụ: "Leather", "42")
 }
+
+interface ProductImageResponseDto {
+  id: number;                    // ID của hình ảnh
+  productId: number;             // ID của sản phẩm
+  imageUrl: string;              // URL của hình ảnh (Cloudinary hoặc CDN)
+  altText: string | null;        // Mô tả hình ảnh (cho accessibility)
+  isPrimary: boolean;            // Có phải hình ảnh chính không
+}
 ```
 
 ---
@@ -439,6 +530,7 @@ interface ProductSpecificationResponseDto {
 
 ### Get All Products
 ```javascript
+// Lấy tất cả products
 const response = await fetch('https://api.example.com/api/products', {
   method: 'GET',
   headers: {
@@ -449,6 +541,50 @@ const response = await fetch('https://api.example.com/api/products', {
 const data = await response.json();
 if (data.success) {
   console.log(data.data); // Array of products
+}
+```
+
+### Get All Products với Filter
+```javascript
+// Lọc theo brandId, categoryId và khoảng giá
+const queryParams = new URLSearchParams({
+  brandId: '4',
+  categoryId: '1',
+  minPrice: '15044245',
+  maxPrice: '31821531'
+});
+
+const response = await fetch(`https://api.example.com/api/products?${queryParams}`, {
+  method: 'GET',
+  headers: {
+    'Content-Type': 'application/json',
+  }
+});
+
+const data = await response.json();
+if (data.success) {
+  console.log(data.data); // Array of filtered products
+}
+```
+
+### Get All Products với Sorting
+```javascript
+// Sắp xếp theo giá tăng dần
+const queryParams = new URLSearchParams({
+  sortBy: 'price',
+  sortDir: 'asc'
+});
+
+const response = await fetch(`https://api.example.com/api/products?${queryParams}`, {
+  method: 'GET',
+  headers: {
+    'Content-Type': 'application/json',
+  }
+});
+
+const data = await response.json();
+if (data.success) {
+  console.log(data.data); // Array of products sorted by price ascending
 }
 ```
 
@@ -639,3 +775,18 @@ if (data.success) {
 5. **Phân quyền:** Chỉ Admin mới có thể Create, Update, Delete product
 6. **Get operations:** Tất cả user đều có thể xem danh sách và chi tiết product
 7. **Validation:** BrandId, CategoryId, ColorIds phải tồn tại trong database
+8. **Hình ảnh sản phẩm:**
+   - Hình ảnh được quản lý riêng qua API `/api/product-images`
+   - Khi lấy danh sách hoặc chi tiết product, tất cả hình ảnh của sản phẩm sẽ được trả về trong field `images`
+   - Field `images` là mảng rỗng `[]` nếu sản phẩm chưa có hình ảnh
+   - Mỗi hình ảnh có thể được đánh dấu là `isPrimary: true` để làm hình ảnh chính
+9. **Thống kê Review:**
+   - `averageRating`: Điểm đánh giá trung bình từ 1-5, làm tròn 2 chữ số thập phân
+   - `totalReviews`: Tổng số lượng review của sản phẩm
+   - Nếu sản phẩm chưa có review, `averageRating` sẽ là `0` và `totalReviews` sẽ là `0`
+   - Thông tin này được tính toán tự động từ tất cả các review của sản phẩm
+10. **Filter và Sorting:**
+    - API Get All Products hỗ trợ filter theo `brandId`, `categoryId`, `minPrice`, `maxPrice`
+    - Hỗ trợ sorting theo `createdAt`, `price`, `name` với hướng `asc` hoặc `desc`
+    - Tất cả query parameters đều optional, có thể kết hợp nhiều filter cùng lúc
+    - Khi filter theo giá, sử dụng giá gốc (`price`) chứ không phải giá khuyến mãi (`discountPrice`)

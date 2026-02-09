@@ -109,7 +109,9 @@ class ApiClient {
         ...API_CONFIG.DEFAULT_HEADERS,
         ...headers,
       },
-      credentials: 'include', // Quan trọng: để gửi cookie refreshToken
+      // Chỉ dùng credentials cho protected API (cần cookie refreshToken)
+      // Public API không cần credentials để tránh CORS preflight OPTIONS request
+      credentials: isPublic ? 'omit' : 'include',
       cache,
     };
 
@@ -136,7 +138,7 @@ class ApiClient {
           
           // Retry request với token mới
           return this.requestWithRetry<T>(endpoint, options, retryCount + 1);
-        } catch (refreshError) {
+        } catch {
           // Refresh token thất bại, throw error
           throw new Error('Authentication failed. Please login again.');
         }
@@ -155,7 +157,46 @@ class ApiClient {
       const data = await response.json();
       return data as T;
     } catch (error) {
-      console.error('API Request failed:', error);
+      // Xử lý các loại lỗi khác nhau
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        // Network error hoặc CORS error
+        const networkError = new Error(
+          `Không thể kết nối đến server. Vui lòng kiểm tra:\n` +
+          `1. Server có đang chạy không?\n` +
+          `2. URL API có đúng không? (${url})\n` +
+          `3. CORS đã được cấu hình đúng chưa?`
+        ) as Error & { 
+          statusCode?: number; 
+          data?: unknown;
+          isNetworkError?: boolean;
+        };
+        networkError.statusCode = 0;
+        networkError.isNetworkError = true;
+        console.error('Network Error:', {
+          url,
+          baseURL: this.baseURL,
+          endpoint,
+          error: error.message,
+        });
+        throw networkError;
+      }
+      
+      // Nếu error đã có statusCode thì giữ nguyên
+      if (error instanceof Error && 'statusCode' in error) {
+        const errorWithStatusCode = error as Error & { statusCode: number };
+        console.error('API Request failed:', {
+          url,
+          statusCode: errorWithStatusCode.statusCode,
+          message: error.message,
+        });
+        throw error;
+      }
+      
+      // Lỗi khác
+      console.error('API Request failed:', {
+        url,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }

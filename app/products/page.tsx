@@ -1,0 +1,305 @@
+/**
+ * Products Page
+ * Trang danh sách sản phẩm với filters
+ */
+
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Header from '@/components/layout/Header';
+import Footer from '@/components/layout/Footer';
+import ProductCard from '@/components/products/ProductCard';
+import Card from '@/components/ui/Card';
+import PriceRangeSlider from '@/components/products/PriceRangeSlider';
+import { useProductsWithFilters } from '@/hooks/use-products-with-filters';
+import { useDebounce } from '@/hooks/use-debounce';
+import { useCategories } from '@/hooks/use-categories';
+import { useBrands } from '@/hooks/use-brands';
+import type { ProductFilters as ProductFiltersType } from '@/services/product.service';
+import { FunnelIcon, MagnifyingGlassIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+
+export default function ProductsPage() {
+  const searchParams = useSearchParams();
+  const [sortBy, setSortBy] = useState<'name' | 'price-asc' | 'price-desc'>('name');
+  const { categories, loading: categoriesLoading } = useCategories();
+  const { brands, loading: brandsLoading } = useBrands();
+
+  // Lấy filters từ URL params
+  const urlFilters = useMemo(() => {
+    const brandId = searchParams.get('brand');
+    const categoryId = searchParams.get('category');
+    const search = searchParams.get('search');
+
+    const newFilters: ProductFiltersType = {};
+    if (brandId) newFilters.brandId = Number(brandId);
+    if (categoryId) newFilters.categoryId = Number(categoryId);
+    if (search) newFilters.search = search;
+
+    return newFilters;
+  }, [searchParams]);
+
+  // State cho filters (có thể thay đổi từ UI)
+  const [filters, setFilters] = useState<ProductFiltersType>(urlFilters);
+
+  // Sync filters với URL params khi URL thay đổi
+  useEffect(() => {
+    setFilters(urlFilters);
+  }, [urlFilters]);
+
+  // Debounce tất cả filters 1 giây trước khi gọi API
+  const debouncedFilters = useDebounce(filters, 1000);
+
+  // Debug: Log filters trước khi gửi xuống backend
+  useEffect(() => {
+    console.log('🔍 [Products Page] Filters trước khi gửi xuống BE:', debouncedFilters);
+  }, [debouncedFilters]);
+
+  // Gửi tất cả filters xuống backend (bao gồm cả minPrice và maxPrice)
+  const { products, loading, error } = useProductsWithFilters(debouncedFilters);
+
+  // Debug: Log products sau khi nhận từ backend
+  useEffect(() => {
+    if (products.length > 0) {
+      console.log('✅ [Products Page] Products nhận từ BE:', {
+        count: products.length,
+        firstProduct: products[0],
+        allProducts: products,
+      });
+    }
+  }, [products]);
+
+  // Sort products
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      switch (sortBy) {
+        case 'price-asc':
+          return (a.discountPrice ?? a.price) - (b.discountPrice ?? b.price);
+        case 'price-desc':
+          return (b.discountPrice ?? b.price) - (a.discountPrice ?? a.price);
+        case 'name':
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+  }, [products, sortBy]);
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-grow bg-[#F5F5F5]">
+        <div className="container mx-auto px-4 py-8">
+          {/* Page Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl md:text-4xl font-bold text-[#333333] mb-2">
+              Danh sách sản phẩm
+            </h1>
+            <p className="text-gray-600">
+              Tìm kiếm và lọc sản phẩm theo nhu cầu của bạn
+            </p>
+          </div>
+
+          {/* Filters and Sort Bar - Single Row */}
+          <Card className="mb-6">
+            <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
+              {/* Filters Section */}
+              <div className="flex-1 flex flex-wrap items-center gap-3">
+                {/* Search */}
+                <div className="flex-1 min-w-[200px]">
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      value={filters.search || ''}
+                      onChange={(e) => setFilters({ ...filters, search: e.target.value || undefined })}
+                      placeholder="Tìm kiếm sản phẩm..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] focus:border-transparent transition-all text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Price Range */}
+                <div className="flex-1 min-w-[200px]">
+                  <PriceRangeSlider
+                    min={0}
+                    max={50000000}
+                    minValue={filters.minPrice}
+                    maxValue={filters.maxPrice}
+                    onChange={(min, max) => {
+                      setFilters({
+                        ...filters,
+                        minPrice: min,
+                        maxPrice: max,
+                      });
+                    }}
+                  />
+                </div>
+
+                {/* Brand Dropdown */}
+                <div className="min-w-[150px]">
+                  <div className="relative">
+                    {brandsLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#FF4F00]"></div>
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          value={filters.brandId || ''}
+                          onChange={(e) =>
+                            setFilters({
+                              ...filters,
+                              brandId: e.target.value ? Number(e.target.value) : undefined,
+                            })
+                          }
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] focus:border-transparent transition-all bg-white appearance-none cursor-pointer text-sm"
+                        >
+                          <option value="">Tất cả thương hiệu</option>
+                          {brands.map((brand) => (
+                            <option key={brand.id} value={brand.id}>
+                              {brand.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Category Dropdown */}
+                <div className="min-w-[150px]">
+                  <div className="relative">
+                    {categoriesLoading ? (
+                      <div className="flex items-center justify-center py-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#FF4F00]"></div>
+                      </div>
+                    ) : (
+                      <>
+                        <select
+                          value={filters.categoryId || ''}
+                          onChange={(e) =>
+                            setFilters({
+                              ...filters,
+                              categoryId: e.target.value ? Number(e.target.value) : undefined,
+                            })
+                          }
+                          className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] focus:border-transparent transition-all bg-white appearance-none cursor-pointer text-sm"
+                        >
+                          <option value="">Tất cả danh mục</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>
+                              {category.name}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Clear Filters Button */}
+                {Object.keys(filters).length > 0 && (
+                  <button
+                    onClick={() => setFilters({})}
+                    className="px-4 py-2 text-sm text-[#FF4F00] hover:bg-[#FF4F00]/10 rounded-lg transition-colors font-medium"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                )}
+              </div>
+
+              {/* Sort and Results Count */}
+              <div className="flex items-center gap-4 border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-4">
+                <div className="text-sm text-gray-600 whitespace-nowrap">
+                  Tìm thấy <span className="font-semibold text-[#FF4F00]">{loading ? '...' : sortedProducts.length}</span> sản phẩm
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600 whitespace-nowrap">Sắp xếp:</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) =>
+                      setSortBy(e.target.value as 'name' | 'price-asc' | 'price-desc')
+                    }
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] text-sm"
+                  >
+                    <option value="name">Tên A-Z</option>
+                    <option value="price-asc">Giá tăng dần</option>
+                    <option value="price-desc">Giá giảm dần</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Products Grid */}
+          <div className="relative">
+
+              {/* Loading State - Initial load */}
+              {loading && sortedProducts.length === 0 && (
+                <div className="flex justify-center items-center py-20">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF4F00]"></div>
+                </div>
+              )}
+
+              {/* Error State */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700">
+                  <p className="font-semibold text-lg mb-2">Lỗi khi tải sản phẩm</p>
+                  <p className="text-sm mb-4 whitespace-pre-line">{error.message}</p>
+                  {'isNetworkError' in error && (error as { isNetworkError?: boolean }).isNetworkError && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border border-red-200">
+                      <p className="text-sm font-semibold mb-2">Gợi ý khắc phục:</p>
+                      <ul className="text-sm list-disc list-inside space-y-1 text-gray-700">
+                        <li>Kiểm tra xem backend server có đang chạy không</li>
+                        <li>Kiểm tra biến môi trường NEXT_PUBLIC_API_URL trong file .env.local</li>
+                        <li>Kiểm tra cấu hình CORS trên backend</li>
+                        <li>Kiểm tra kết nối mạng</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Empty State */}
+              {!loading && !error && sortedProducts.length === 0 && (
+                <div className="bg-white rounded-lg p-12 text-center">
+                  <FunnelIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    Không tìm thấy sản phẩm
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    Thử thay đổi bộ lọc để tìm thêm sản phẩm
+                  </p>
+                  <button
+                    onClick={() => setFilters({})}
+                    className="px-6 py-2 bg-[#FF4F00] text-white rounded-lg hover:bg-[#e64500] transition-colors"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                </div>
+              )}
+
+              {/* Products Grid */}
+              {!loading && !error && sortedProducts.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {sortedProducts.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+              )}
+
+              {/* Loading overlay khi đang filter (có products cũ) */}
+              {loading && sortedProducts.length > 0 && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF4F00]"></div>
+                </div>
+              )}
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
