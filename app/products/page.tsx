@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -17,11 +17,14 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { useCategories } from '@/hooks/use-categories';
 import { useBrands } from '@/hooks/use-brands';
 import type { ProductFilters as ProductFiltersType } from '@/services/product.service';
-import { FunnelIcon, MagnifyingGlassIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { FunnelIcon, MagnifyingGlassIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
   const [sortBy, setSortBy] = useState<'name' | 'price-asc' | 'price-desc'>('name');
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+  const priceButtonRef = useRef<HTMLButtonElement>(null);
+  const priceModalRef = useRef<HTMLDivElement>(null);
   const { categories, loading: categoriesLoading } = useCategories();
   const { brands, loading: brandsLoading } = useBrands();
 
@@ -84,6 +87,40 @@ export default function ProductsPage() {
     });
   }, [products, sortBy]);
 
+  // Check if price filter is active
+  const hasPriceFilter = filters.minPrice !== undefined || filters.maxPrice !== undefined;
+
+  // Format price range for button display
+  const priceRangeDisplay = useMemo(() => {
+    if (!hasPriceFilter) return 'Khoảng giá';
+    const min = filters.minPrice ? filters.minPrice.toLocaleString('vi-VN') : '0';
+    const max = filters.maxPrice ? filters.maxPrice.toLocaleString('vi-VN') : '50.000.000';
+    return `${min} ₫ - ${max} ₫`;
+  }, [hasPriceFilter, filters.minPrice, filters.maxPrice]);
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isPriceModalOpen &&
+        priceModalRef.current &&
+        priceButtonRef.current &&
+        !priceModalRef.current.contains(event.target as Node) &&
+        !priceButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsPriceModalOpen(false);
+      }
+    };
+
+    if (isPriceModalOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPriceModalOpen]);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -118,21 +155,66 @@ export default function ProductsPage() {
                   </div>
                 </div>
 
-                {/* Price Range */}
-                <div className="flex-1 min-w-[200px]">
-                  <PriceRangeSlider
-                    min={0}
-                    max={50000000}
-                    minValue={filters.minPrice}
-                    maxValue={filters.maxPrice}
-                    onChange={(min, max) => {
-                      setFilters({
-                        ...filters,
-                        minPrice: min,
-                        maxPrice: max,
-                      });
-                    }}
-                  />
+                {/* Price Range - Button with Modal */}
+                <div className="flex-1 min-w-[200px] relative">
+                  <button
+                    ref={priceButtonRef}
+                    onClick={() => setIsPriceModalOpen(!isPriceModalOpen)}
+                    className={`w-full px-4 py-2 border-2 rounded-lg transition-all text-left flex items-center justify-between text-sm ${
+                      hasPriceFilter
+                        ? 'border-[#FF4F00] bg-[#FF4F00]/5 text-[#FF4F00]'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-[#FF4F00]'
+                    }`}
+                  >
+                    <span className={hasPriceFilter ? 'font-semibold' : ''}>
+                      {priceRangeDisplay}
+                    </span>
+                    <ChevronDownIcon
+                      className={`w-5 h-5 transition-transform ${
+                        isPriceModalOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+
+                  {/* Price Modal */}
+                  {isPriceModalOpen && (
+                    <>
+                      {/* Overlay */}
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsPriceModalOpen(false)}
+                      />
+                      {/* Modal Content */}
+                      <div
+                        ref={priceModalRef}
+                        className="absolute top-full left-0 right-0 mt-2 z-50 bg-white rounded-lg shadow-xl border-2 border-gray-200 p-4"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-semibold text-[#333333] text-sm">Chọn khoảng giá</h4>
+                          <button
+                            onClick={() => setIsPriceModalOpen(false)}
+                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            aria-label="Đóng"
+                          >
+                            <XMarkIcon className="w-5 h-5 text-gray-600" />
+                          </button>
+                        </div>
+                        <PriceRangeSlider
+                          min={0}
+                          max={50000000}
+                          minValue={filters.minPrice}
+                          maxValue={filters.maxPrice}
+                          onChange={(min, max) => {
+                            setFilters({
+                              ...filters,
+                              minPrice: min,
+                              maxPrice: max,
+                            });
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Brand Dropdown */}
@@ -210,25 +292,20 @@ export default function ProductsPage() {
                 )}
               </div>
 
-              {/* Sort and Results Count */}
-              <div className="flex items-center gap-4 border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-4">
-                <div className="text-sm text-gray-600 whitespace-nowrap">
-                  Tìm thấy <span className="font-semibold text-[#FF4F00]">{loading ? '...' : sortedProducts.length}</span> sản phẩm
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-gray-600 whitespace-nowrap">Sắp xếp:</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) =>
-                      setSortBy(e.target.value as 'name' | 'price-asc' | 'price-desc')
-                    }
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] text-sm"
-                  >
-                    <option value="name">Tên A-Z</option>
-                    <option value="price-asc">Giá tăng dần</option>
-                    <option value="price-desc">Giá giảm dần</option>
-                  </select>
-                </div>
+              {/* Sort */}
+              <div className="flex items-center gap-2 border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-4">
+                <label className="text-sm text-gray-600 whitespace-nowrap">Sắp xếp:</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) =>
+                    setSortBy(e.target.value as 'name' | 'price-asc' | 'price-desc')
+                  }
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] text-sm"
+                >
+                  <option value="name">Tên A-Z</option>
+                  <option value="price-asc">Giá tăng dần</option>
+                  <option value="price-desc">Giá giảm dần</option>
+                </select>
               </div>
             </div>
           </Card>

@@ -6,7 +6,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -25,7 +25,6 @@ import { ChevronRightIcon, HomeIcon } from '@heroicons/react/24/outline';
 
 export default function ProductDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const productId = params.id as string;
 
   // Fetch product
@@ -52,7 +51,6 @@ export default function ProductDetailPage() {
   const {
     stats,
     loading: statsLoading,
-    error: statsError,
     refetch: refetchStats,
   } = useProductReviewStats(product?.id || null);
 
@@ -143,7 +141,9 @@ export default function ProductDetailPage() {
 
             {/* Product Info */}
             <div>
-              <ProductInfo product={product} />
+              <Card>
+                <ProductInfo product={product} />
+              </Card>
             </div>
           </div>
 

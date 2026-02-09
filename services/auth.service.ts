@@ -57,11 +57,12 @@ export const authService = {
    * RefreshToken được tự động set vào cookie (HttpOnly)
    */
   login: async (data: LoginRequest): Promise<LoginResponse> => {
+    // Login cần credentials: 'include' để nhận cookie refreshToken
     const response = await apiClient.post<ApiResponse<LoginResponse>>(
       API_ENDPOINTS.LOGIN,
       {
         body: data,
-        public: true, // API public, không cần auth
+        public: true, // API public, không cần Bearer token nhưng cần credentials để nhận cookie
       }
     );
 

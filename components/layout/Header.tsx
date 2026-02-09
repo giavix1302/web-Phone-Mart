@@ -7,6 +7,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import {
   ShoppingCartIcon,
@@ -16,8 +17,18 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Header() {
+  const router = useRouter();
   const { isAuthenticated, user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
+  };
 
   const menuItems = [
     { label: 'Trang chủ', href: '/' },
@@ -74,7 +85,7 @@ export default function Header() {
                     Tài khoản
                   </Link>
                   <button
-                    onClick={logout}
+                    onClick={handleLogout}
                     className="block w-full text-left px-4 py-2 text-sm text-[#333333] hover:bg-[#F5F5F5]"
                   >
                     Đăng xuất

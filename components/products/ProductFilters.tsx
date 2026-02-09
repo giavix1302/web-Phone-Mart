@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { XMarkIcon, FunnelIcon, MagnifyingGlassIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { useCategories } from '@/hooks/use-categories';
 import { useBrands } from '@/hooks/use-brands';
@@ -25,6 +25,9 @@ export default function ProductFilters({
   priceRange = { min: 0, max: 50000000 }, // Default range: 0 - 50 triệu
 }: ProductFiltersProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+  const priceButtonRef = useRef<HTMLButtonElement>(null);
+  const priceModalRef = useRef<HTMLDivElement>(null);
   // Local state cho search để tránh mất focus khi re-render
   const [searchValue, setSearchValue] = useState(() => filters.search || '');
   const { categories, loading: categoriesLoading } = useCategories();
@@ -53,6 +56,40 @@ export default function ProductFilters({
   const activeFiltersCount = useMemo(() => {
     return Object.keys(filters).length;
   }, [filters]);
+
+  // Check if price filter is active
+  const hasPriceFilter = filters.minPrice !== undefined || filters.maxPrice !== undefined;
+
+  // Format price range for button display
+  const priceRangeDisplay = useMemo(() => {
+    if (!hasPriceFilter) return 'Khoảng giá';
+    const min = filters.minPrice ? filters.minPrice.toLocaleString('vi-VN') : '0';
+    const max = filters.maxPrice ? filters.maxPrice.toLocaleString('vi-VN') : '50.000.000';
+    return `${min} ₫ - ${max} ₫`;
+  }, [hasPriceFilter, filters.minPrice, filters.maxPrice]);
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        isPriceModalOpen &&
+        priceModalRef.current &&
+        priceButtonRef.current &&
+        !priceModalRef.current.contains(event.target as Node) &&
+        !priceButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsPriceModalOpen(false);
+      }
+    };
+
+    if (isPriceModalOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPriceModalOpen]);
 
   return (
     <>
@@ -132,24 +169,69 @@ export default function ProductFilters({
               </div>
             </div>
 
-            {/* Price Range Slider */}
-            <div>
+            {/* Price Range - Button with Modal */}
+            <div className="relative">
               <label className="block text-sm font-semibold text-[#333333] mb-3">
                 Khoảng giá
               </label>
-              <PriceRangeSlider
-                min={priceRange.min}
-                max={priceRange.max}
-                minValue={filters.minPrice}
-                maxValue={filters.maxPrice}
-                onChange={(min, max) => {
-                  onFiltersChange({
-                    ...filters,
-                    minPrice: min,
-                    maxPrice: max,
-                  });
-                }}
-              />
+              <button
+                ref={priceButtonRef}
+                onClick={() => setIsPriceModalOpen(!isPriceModalOpen)}
+                className={`w-full px-4 py-2.5 border-2 rounded-lg transition-all text-left flex items-center justify-between ${
+                  hasPriceFilter
+                    ? 'border-[#FF4F00] bg-[#FF4F00]/5 text-[#FF4F00]'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-[#FF4F00]'
+                }`}
+              >
+                <span className={hasPriceFilter ? 'font-semibold' : ''}>
+                  {priceRangeDisplay}
+                </span>
+                <ChevronDownIcon
+                  className={`w-5 h-5 transition-transform ${
+                    isPriceModalOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              {/* Price Modal */}
+              {isPriceModalOpen && (
+                <>
+                  {/* Overlay */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsPriceModalOpen(false)}
+                  />
+                  {/* Modal Content */}
+                  <div
+                    ref={priceModalRef}
+                    className="absolute top-full left-0 right-0 mt-2 z-50 bg-white rounded-lg shadow-xl border-2 border-gray-200 p-4"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold text-[#333333]">Chọn khoảng giá</h4>
+                      <button
+                        onClick={() => setIsPriceModalOpen(false)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        aria-label="Đóng"
+                      >
+                        <XMarkIcon className="w-5 h-5 text-gray-600" />
+                      </button>
+                    </div>
+                    <PriceRangeSlider
+                      min={priceRange.min}
+                      max={priceRange.max}
+                      minValue={filters.minPrice}
+                      maxValue={filters.maxPrice}
+                      onChange={(min, max) => {
+                        onFiltersChange({
+                          ...filters,
+                          minPrice: min,
+                          maxPrice: max,
+                        });
+                      }}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Brand Filter - Dropdown */}

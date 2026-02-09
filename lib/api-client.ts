@@ -103,15 +103,23 @@ class ApiClient {
     // Lấy accessToken nếu không phải public API
     const accessToken = !isPublic ? authStore.getToken() : null;
 
+    // Login và register cần credentials để nhận cookie refreshToken
+    const needsCredentials = 
+      endpoint === API_ENDPOINTS.LOGIN || 
+      endpoint === API_ENDPOINTS.REGISTER || 
+      endpoint === API_ENDPOINTS.VERIFY_REGISTER_OTP ||
+      endpoint === API_ENDPOINTS.REFRESH_TOKEN ||
+      !isPublic;
+
     const config: RequestInit = {
       method,
       headers: {
         ...API_CONFIG.DEFAULT_HEADERS,
         ...headers,
       },
-      // Chỉ dùng credentials cho protected API (cần cookie refreshToken)
-      // Public API không cần credentials để tránh CORS preflight OPTIONS request
-      credentials: isPublic ? 'omit' : 'include',
+      // Login/register cần credentials để nhận cookie refreshToken
+      // Protected API cũng cần credentials để gửi cookie
+      credentials: needsCredentials ? 'include' : 'omit',
       cache,
     };
 

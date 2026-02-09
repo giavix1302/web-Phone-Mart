@@ -59,9 +59,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const verifyRegisterOtp = async (data: VerifyRegisterOtpRequest) => {
-    await authService.verifyRegisterOtp(data);
-    // Sau khi verify thành công, có thể gọi login hoặc lấy user info
-    // Tạm thời chỉ lưu token, user sẽ được set khi login
+    const accessToken = await authService.verifyRegisterOtp(data);
+    // Sau khi verify thành công, token đã được lưu
+    // Có thể gọi API để lấy user info nếu cần
+    // Tạm thời chỉ lưu token, user sẽ được set khi login hoặc khi có API get user info
   };
 
   const logout = async () => {
