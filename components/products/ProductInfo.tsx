@@ -5,7 +5,9 @@
 
 'use client';
 
+import { useState } from 'react';
 import { ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { useCart } from '@/hooks/use-cart';
 import type { Product } from '@/types/api';
 
 interface ProductInfoProps {
@@ -13,11 +15,38 @@ interface ProductInfoProps {
 }
 
 export default function ProductInfo({ product }: ProductInfoProps) {
+  const { addToCart, isLoading } = useCart();
+  const [selectedColorId, setSelectedColorId] = useState<number | undefined>(undefined);
+  const [isAdding, setIsAdding] = useState(false);
+
   const finalPrice = product.discountPrice ?? product.price;
   const hasDiscount = product.discountPrice !== null && product.discountPrice < product.price;
   const discountPercent = hasDiscount
     ? Math.round(((product.price - product.discountPrice!) / product.price) * 100)
     : 0;
+
+  const hasColors = product.colors && product.colors.length > 0;
+  const isColorRequired = hasColors && selectedColorId === undefined;
+
+  const handleAddToCart = async () => {
+    // Validate color selection
+    if (hasColors && !selectedColorId) {
+      alert('Vui lòng chọn màu sắc trước khi thêm vào giỏ hàng');
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      await addToCart(product.id, selectedColorId, 1);
+      // Show success message (you can replace with a toast notification)
+      alert('Đã thêm sản phẩm vào giỏ hàng!');
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      alert('Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại.');
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -85,12 +114,23 @@ export default function ProductInfo({ product }: ProductInfoProps) {
       {/* Colors */}
       {product.colors && product.colors.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-[#333333] mb-3">Màu sắc:</h3>
+          <h3 className="text-sm font-semibold text-[#333333] mb-3">
+            Màu sắc: {selectedColorId && (
+              <span className="text-[#FF4F00] font-normal">
+                ({product.colors.find((c) => c.id === selectedColorId)?.colorName})
+              </span>
+            )}
+          </h3>
           <div className="flex flex-wrap gap-2">
             {product.colors.map((color) => (
               <button
                 key={color.id}
-                className="w-10 h-10 rounded-full border-2 border-gray-300 hover:border-[#FF4F00] transition-colors"
+                onClick={() => setSelectedColorId(color.id)}
+                className={`w-10 h-10 rounded-full border-2 transition-colors ${
+                  selectedColorId === color.id
+                    ? 'border-[#FF4F00] ring-2 ring-[#FF4F00] ring-offset-2'
+                    : 'border-gray-300 hover:border-[#FF4F00]'
+                }`}
                 style={{
                   backgroundColor: color.hexCode || '#ccc',
                 }}
@@ -99,6 +139,9 @@ export default function ProductInfo({ product }: ProductInfoProps) {
               />
             ))}
           </div>
+          {isColorRequired && (
+            <p className="text-sm text-red-600 mt-2">Vui lòng chọn màu sắc</p>
+          )}
         </div>
       )}
 
@@ -133,15 +176,20 @@ export default function ProductInfo({ product }: ProductInfoProps) {
 
       {/* Add to Cart Button */}
       <button
-        disabled={product.stockQuantity === 0}
+        onClick={handleAddToCart}
+        disabled={product.stockQuantity === 0 || isAdding || isLoading || isColorRequired}
         className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold transition-colors ${
-          product.stockQuantity > 0
+          product.stockQuantity > 0 && !isAdding && !isLoading && !isColorRequired
             ? 'bg-[#FF4F00] text-white hover:bg-[#e64500]'
             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
         }`}
       >
         <ShoppingCartIcon className="w-5 h-5" />
-        {product.stockQuantity > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng'}
+        {isAdding || isLoading
+          ? 'Đang thêm...'
+          : product.stockQuantity > 0
+          ? 'Thêm vào giỏ hàng'
+          : 'Hết hàng'}
       </button>
     </div>
   );

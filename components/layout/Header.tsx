@@ -6,9 +6,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
+import { useCart } from '@/hooks/use-cart';
+import { cartStore } from '@/lib/cart-store';
 import {
   ShoppingCartIcon,
   UserIcon,
@@ -18,8 +20,47 @@ import {
 
 export default function Header() {
   const router = useRouter();
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, isLoading: authLoading } = useAuth();
+  const { cart } = useCart();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Only run on client side to avoid hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Wait for auth to be checked before showing authenticated state
+  // Always show login button on server and initial client render to avoid hydration mismatch
+  // Only show authenticated state after component has mounted AND auth check is complete
+  const showAuthenticatedState = isMounted && !authLoading && isAuthenticated;
+
+  // Update cart item count
+  useEffect(() => {
+    if (!isMounted) return;
+
+    if (isAuthenticated && cart) {
+      setCartItemCount(cart.totalItems);
+    } else {
+      // Get count from localStorage (only on client)
+      setCartItemCount(cartStore.getLocalCartItemCount());
+    }
+  }, [isAuthenticated, cart, isMounted]);
+
+  // Listen for cart updates (for local cart)
+  useEffect(() => {
+    if (!isMounted) return;
+
+    const handleCartUpdate = () => {
+      if (!isAuthenticated) {
+        setCartItemCount(cartStore.getLocalCartItemCount());
+      }
+    };
+
+    window.addEventListener('cartUpdated', handleCartUpdate);
+    return () => window.removeEventListener('cartUpdated', handleCartUpdate);
+  }, [isAuthenticated, isMounted]);
 
   const handleLogout = async () => {
     try {
@@ -33,6 +74,7 @@ export default function Header() {
   const menuItems = [
     { label: 'Trang chủ', href: '/' },
     { label: 'Sản phẩm', href: '/products' },
+    { label: 'Đơn hàng của tôi', href: '/orders' },
     { label: 'Liên hệ', href: '/contact' },
     { label: 'Về chúng tôi', href: '/about' },
   ];
@@ -68,13 +110,15 @@ export default function Header() {
               className="relative p-2 text-[#333333] hover:text-[#FF4F00] transition-colors"
             >
               <ShoppingCartIcon className="w-6 h-6" />
-              <span className="absolute top-0 right-0 bg-[#FF4F00] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                0
-              </span>
+              {isMounted && cartItemCount > 0 && (
+                <span className="absolute top-0 right-0 bg-[#FF4F00] text-white text-xs rounded-full min-w-[20px] h-5 flex items-center justify-center px-1">
+                  {cartItemCount > 99 ? '99+' : cartItemCount}
+                </span>
+              )}
             </Link>
 
             {/* Login/User Menu */}
-            {isAuthenticated ? (
+            {showAuthenticatedState ? (
               <div className="relative group">
                 <button className="flex items-center space-x-2 px-4 py-2 text-[#333333] hover:text-[#FF4F00] transition-colors">
                   <span className="hidden sm:inline">{user?.fullName || user?.email}</span>

@@ -10,6 +10,22 @@ export interface User {
   roles: string[];
 }
 
+export interface UserProfile {
+  id: number;
+  email: string;
+  fullName: string | null;
+  address: string | null;
+  note: string | null;
+  avatarUrl: string | null;
+  createdAt: string;
+}
+
+export interface UpdateProfileRequest {
+  fullName?: string;
+  address?: string;
+  note?: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

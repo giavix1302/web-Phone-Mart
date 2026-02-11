@@ -34,4 +34,24 @@ export const API_ENDPOINTS = {
   REVIEW_BY_ID: (reviewId: string | number) => `/reviews/${reviewId}`,
   PRODUCT_REVIEWS: (productId: string | number) => `/products/${productId}/reviews`,
   PRODUCT_REVIEW_STATS: (productId: string | number) => `/products/${productId}/reviews/stats`,
+  
+  // Cart
+  CART_ME: '/carts/me',
+  CART_ITEMS: '/carts/items',
+  CART_ITEMS_BATCH: '/carts/items/batch',
+  CART_ITEM_BY_ID: (itemId: string | number) => `/carts/items/${itemId}`,
+  CART_CLEAR: '/carts/clear',
+  
+  // Orders
+  ORDERS: '/orders',
+  ORDERS_ME: '/orders/me',
+  ORDER_BY_ID: (orderId: string | number) => `/orders/${orderId}`,
+  ORDER_ME_BY_ID: (orderId: string | number) => `/orders/me/${orderId}`,
+  ORDER_CANCEL: (orderId: string | number) => `/orders/${orderId}/cancel`,
+  ORDER_TRACKING: (orderId: string | number) => `/orders/${orderId}/tracking`,
+  
+  // User Profile
+  USER_ME: '/users/me',
+  USER_ME_PROFILE: '/users/me/profile',
+  USER_ME_AVATAR: '/users/me/avatar',
 } as const;
