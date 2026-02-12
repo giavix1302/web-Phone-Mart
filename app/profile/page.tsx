@@ -14,9 +14,15 @@ import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
 import { useAuth } from '@/hooks/use-auth';
 import { userService } from '@/services/user.service';
+import { reviewService } from '@/services/review.service';
+import { useMyReviews } from '@/hooks/use-my-reviews';
+import ReviewCard from '@/components/reviews/ReviewCard';
+import EditReviewModal from '@/components/reviews/EditReviewModal';
+import Pagination from '@/components/reviews/Pagination';
 import { HomeIcon, CameraIcon } from '@heroicons/react/24/outline';
 import { ChevronRightIcon } from '@heroicons/react/24/solid';
 import type { UserProfile, UpdateProfileRequest } from '@/types/auth';
+import type { Review } from '@/types/api';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -30,6 +36,12 @@ export default function ProfilePage() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  // My Reviews state
+  const [reviewFilters, setReviewFilters] = useState({ page: 1, pageSize: 10 });
+  const { reviews, loading: reviewsLoading, error: reviewsError, pagination, refetch: refetchReviews } = useMyReviews(reviewFilters);
+  const [editingReview, setEditingReview] = useState<Review | null>(null);
+  const [isDeleting, setIsDeleting] = useState<number | null>(null);
 
   // Form state
   const [fullName, setFullName] = useState('');
@@ -170,6 +182,34 @@ export default function ProfilePage() {
       });
   };
 
+  const handleEditReview = (review: Review) => {
+    setEditingReview(review);
+  };
+
+  const handleDeleteReview = async (reviewId: number) => {
+    const confirmed = window.confirm('Bạn có chắc chắn muốn xóa đánh giá này?');
+    if (!confirmed) return;
+
+    setIsDeleting(reviewId);
+    try {
+      await reviewService.deleteReview(reviewId);
+      refetchReviews();
+    } catch (err: any) {
+      alert(err?.message || 'Không thể xóa đánh giá. Vui lòng thử lại.');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  const handleReviewUpdated = () => {
+    refetchReviews();
+    setEditingReview(null);
+  };
+
+  const handleReviewPageChange = (page: number) => {
+    setReviewFilters((prev) => ({ ...prev, page }));
+  };
+
   // Show loading or redirect if not ready
   if (authLoading || !isAuthenticated) {
     return (
@@ -225,7 +265,8 @@ export default function ProfilePage() {
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF4F00]"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left: Profile Form */}
               <div className="lg:col-span-2">
                 <Card>
@@ -446,7 +487,60 @@ export default function ProfilePage() {
                 </Card>
               </div>
             </div>
+
+            {/* My Reviews Section */}
+            <div className="mt-8">
+              <Card>
+                <h2 className="text-xl font-bold text-[#333333] mb-6">Đánh giá của tôi</h2>
+
+                {reviewsLoading && reviews.length === 0 ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF4F00]"></div>
+                  </div>
+                ) : reviewsError ? (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+                    <p className="font-semibold">Lỗi khi tải đánh giá</p>
+                    <p className="text-sm mt-1">{reviewsError.message}</p>
+                  </div>
+                ) : reviews.length === 0 ? (
+                  <div className="bg-gray-50 rounded-lg p-12 text-center border border-gray-200">
+                    <p className="text-gray-500">Bạn chưa có đánh giá nào</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {reviews.map((review) => (
+                      <ReviewCard
+                        key={review.id}
+                        review={review}
+                        onEdit={handleEditReview}
+                        onDelete={handleDeleteReview}
+                      />
+                    ))}
+
+                    {/* Pagination */}
+                    {pagination && pagination.totalPages > 1 && (
+                      <div className="mt-6">
+                        <Pagination
+                          currentPage={pagination.page}
+                          totalPages={pagination.totalPages}
+                          onPageChange={handleReviewPageChange}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            </div>
+            </>
           )}
+
+          {/* Edit Review Modal */}
+          <EditReviewModal
+            review={editingReview}
+            isOpen={editingReview !== null}
+            onClose={() => setEditingReview(null)}
+            onSuccess={handleReviewUpdated}
+          />
         </div>
       </main>
       <Footer />

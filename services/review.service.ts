@@ -101,4 +101,41 @@ export const reviewService = {
       public: false, // Cần auth
     });
   },
+
+  /**
+   * Lấy danh sách reviews của tôi (Cần auth)
+   */
+  getMyReviews: async (filters?: ReviewFilters): Promise<PaginatedReviewResponse> => {
+    const params = new URLSearchParams();
+    
+    if (filters?.rating) params.append('rating', filters.rating.toString());
+    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters?.sortDir) params.append('sortDir', filters.sortDir);
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.pageSize) params.append('pageSize', filters.pageSize.toString());
+
+    const queryString = params.toString();
+    const endpoint = queryString
+      ? `${API_ENDPOINTS.REVIEWS_ME}?${queryString}`
+      : API_ENDPOINTS.REVIEWS_ME;
+
+    const response = await apiClient.get<ApiResponse<PaginatedReviewResponse>>(endpoint, {
+      public: false, // Cần auth
+    });
+
+    return response.data;
+  },
+
+  /**
+   * Lấy chi tiết review của tôi theo ID (Cần auth)
+   */
+  getMyReviewById: async (reviewId: number | string): Promise<Review> => {
+    const response = await apiClient.get<ApiResponse<Review>>(
+      API_ENDPOINTS.REVIEW_ME_BY_ID(reviewId),
+      {
+        public: false, // Cần auth
+      }
+    );
+    return response.data;
+  },
 };

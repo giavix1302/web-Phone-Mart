@@ -89,6 +89,7 @@ export interface Review {
   productId: number;
   productName: string;
   productSlug: string;
+  orderItemId?: number; // Optional, chỉ có trong reviews của chính user
   rating: number; // 1-5
   comment: string | null;
   createdAt: string;

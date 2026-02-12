@@ -16,6 +16,7 @@ import PaymentMethodBadge from '@/components/orders/PaymentMethodBadge';
 import OrderTrackingTimeline from '@/components/orders/OrderTrackingTimeline';
 import { useAuth } from '@/hooks/use-auth';
 import { orderService } from '@/services/order.service';
+import ReviewButton from '@/components/reviews/ReviewButton';
 import { ArrowLeftIcon, HomeIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { ChevronRightIcon } from '@heroicons/react/24/solid';
 import type { Order } from '@/types/order';
@@ -80,6 +81,18 @@ export default function OrderDetailPage() {
       alert(err.message || 'Không thể hủy đơn hàng. Vui lòng thử lại.');
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  const handleReviewSuccess = async () => {
+    // Refresh order data to get updated isReviewed status
+    if (orderId) {
+      try {
+        const updatedOrder = await orderService.getMyOrderById(orderId);
+        setOrder(updatedOrder);
+      } catch (err) {
+        console.error('Failed to refresh order after review:', err);
+      }
     }
   };
 
@@ -233,38 +246,54 @@ export default function OrderDetailPage() {
               <Card>
                 <h2 className="text-xl font-bold text-[#333333] mb-4">Sản phẩm</h2>
                 <div className="space-y-4">
-                  {order.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex gap-4 pb-4 border-b border-gray-200 last:border-0"
-                    >
-                      <Link
-                        href={`/products/${item.productSlug || item.productId}`}
-                        className="flex-1"
+                  {order.items.map((item) => {
+                    const canReview = order.status === 'DELIVERED' && !item.isReviewed;
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex gap-4 pb-4 border-b border-gray-200 last:border-0"
                       >
-                        <p className="font-semibold text-[#333333] hover:text-[#FF4F00] transition-colors">
-                          {item.productName}
-                        </p>
-                        {item.colorName && (
-                          <div className="flex items-center gap-2 mt-1">
-                            {item.colorHexCode && (
-                              <div
-                                className="w-4 h-4 rounded-full border border-gray-300"
-                                style={{ backgroundColor: item.colorHexCode }}
-                              />
-                            )}
-                            <span className="text-sm text-gray-600">Màu: {item.colorName}</span>
-                          </div>
-                        )}
-                        <p className="text-sm text-gray-600 mt-1">
-                          Số lượng: {item.quantity} × {item.unitPrice.toLocaleString('vi-VN')} ₫
-                        </p>
-                      </Link>
-                      <p className="text-lg font-bold text-[#FF4F00]">
-                        {item.subtotal.toLocaleString('vi-VN')} ₫
-                      </p>
-                    </div>
-                  ))}
+                        <Link
+                          href={`/products/${item.productSlug || item.productId}`}
+                          className="flex-1"
+                        >
+                          <p className="font-semibold text-[#333333] hover:text-[#FF4F00] transition-colors">
+                            {item.productName}
+                          </p>
+                          {item.colorName && (
+                            <div className="flex items-center gap-2 mt-1">
+                              {item.colorHexCode && (
+                                <div
+                                  className="w-4 h-4 rounded-full border border-gray-300"
+                                  style={{ backgroundColor: item.colorHexCode }}
+                                />
+                              )}
+                              <span className="text-sm text-gray-600">Màu: {item.colorName}</span>
+                            </div>
+                          )}
+                          <p className="text-sm text-gray-600 mt-1">
+                            Số lượng: {item.quantity} × {item.unitPrice.toLocaleString('vi-VN')} ₫
+                          </p>
+                        </Link>
+                        <div className="flex flex-col items-end gap-2">
+                          <p className="text-lg font-bold text-[#FF4F00]">
+                            {item.subtotal.toLocaleString('vi-VN')} ₫
+                          </p>
+                          {canReview && (
+                            <ReviewButton
+                              productId={item.productId}
+                              orderItemId={item.id}
+                              productName={item.productName}
+                              onSuccess={handleReviewSuccess}
+                            />
+                          )}
+                          {item.isReviewed && (
+                            <span className="text-xs text-green-600 font-medium">Đã đánh giá</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
 

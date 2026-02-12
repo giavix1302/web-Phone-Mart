@@ -32,6 +32,8 @@ export const API_ENDPOINTS = {
   // Reviews
   REVIEWS: '/reviews',
   REVIEW_BY_ID: (reviewId: string | number) => `/reviews/${reviewId}`,
+  REVIEWS_ME: '/reviews/me',
+  REVIEW_ME_BY_ID: (reviewId: string | number) => `/reviews/me/${reviewId}`,
   PRODUCT_REVIEWS: (productId: string | number) => `/products/${productId}/reviews`,
   PRODUCT_REVIEW_STATS: (productId: string | number) => `/products/${productId}/reviews/stats`,
   

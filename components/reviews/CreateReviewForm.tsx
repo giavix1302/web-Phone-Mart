@@ -12,10 +12,11 @@ import type { Product } from '@/types/api';
 
 interface CreateReviewFormProps {
   product: Product;
+  orderItemId?: number;
   onSuccess: () => void;
 }
 
-export default function CreateReviewForm({ product, onSuccess }: CreateReviewFormProps) {
+export default function CreateReviewForm({ product, orderItemId, onSuccess }: CreateReviewFormProps) {
   const { isAuthenticated } = useAuth();
   const [rating, setRating] = useState<number>(0);
   const [hoveredRating, setHoveredRating] = useState<number>(0);
@@ -49,6 +50,7 @@ export default function CreateReviewForm({ product, onSuccess }: CreateReviewFor
 
       await reviewService.createReview({
         productId: product.id,
+        orderItemId,
         rating,
         comment: comment.trim() || null,
       });

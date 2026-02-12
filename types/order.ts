@@ -18,6 +18,7 @@ export interface OrderItem {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  isReviewed?: boolean; // Optional, chỉ có khi backend trả về
 }
 
 export interface OrderTracking {
