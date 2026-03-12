@@ -5,13 +5,14 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
-import CartItem from '@/components/cart/CartItem';
+import AddressAutocomplete from '@/components/ui/AddressAutocomplete';
+import MapPreview from '@/components/ui/MapPreview';
 import { useCart } from '@/hooks/use-cart';
 import { useAuth } from '@/hooks/use-auth';
 import { orderService } from '@/services/order.service';
@@ -28,10 +29,21 @@ export default function CheckoutPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [shippingAddress, setShippingAddress] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  const handlePlaceSelect = useCallback((lat: number, lng: number, address: string) => {
+    setSelectedLocation({ lat, lng });
+    setShippingAddress(address);
+    setValidationErrors((prev) => {
+      const next = { ...prev };
+      delete next.shippingAddress;
+      return next;
+    });
+  }, []);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -187,36 +199,29 @@ export default function CheckoutPage() {
                     <label className="block text-sm font-semibold text-[#333333] mb-2">
                       Địa chỉ <span className="text-red-500">*</span>
                     </label>
-                    <textarea
+                    <AddressAutocomplete
                       value={shippingAddress}
-                      onChange={(e) => {
-                        setShippingAddress(e.target.value);
+                      onChange={(addr) => {
+                        setShippingAddress(addr);
                         if (validationErrors.shippingAddress) {
                           setValidationErrors((prev) => {
-                            const newErrors = { ...prev };
-                            delete newErrors.shippingAddress;
-                            return newErrors;
+                            const next = { ...prev };
+                            delete next.shippingAddress;
+                            return next;
                           });
                         }
                       }}
-                      placeholder="Nhập địa chỉ giao hàng đầy đủ..."
-                      rows={4}
-                      maxLength={500}
-                      className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] transition-all ${
-                        validationErrors.shippingAddress
-                          ? 'border-red-500'
-                          : 'border-gray-300'
-                      }`}
+                      onPlaceSelect={handlePlaceSelect}
                       disabled={isSubmitting}
+                      error={validationErrors.shippingAddress}
                     />
-                    <div className="flex justify-between items-center mt-1">
-                      {validationErrors.shippingAddress && (
-                        <p className="text-sm text-red-600">{validationErrors.shippingAddress}</p>
-                      )}
-                      <p className="text-sm text-gray-500 ml-auto">
-                        {shippingAddress.length}/500
-                      </p>
-                    </div>
+                    {selectedLocation && (
+                      <MapPreview
+                        lat={selectedLocation.lat}
+                        lng={selectedLocation.lng}
+                        onLocationSelect={handlePlaceSelect}
+                      />
+                    )}
                   </div>
                 </Card>
 

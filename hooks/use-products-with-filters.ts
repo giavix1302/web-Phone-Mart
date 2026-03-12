@@ -5,41 +5,60 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { productService, type ProductFilters } from '@/services/product.service';
 import type { Product } from '@/types/api';
+
+interface Pagination {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
 
 export function useProductsWithFilters(filters?: ProductFilters) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    pageSize: 20,
+    totalCount: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
+
+  // Serialize filters để so sánh ổn định, tránh re-fetch khi reference thay đổi nhưng value giống nhau
+  const filtersKey = JSON.stringify(filters);
+  const prevFiltersKey = useRef<string>('');
 
   useEffect(() => {
+    if (filtersKey === prevFiltersKey.current) return;
+    prevFiltersKey.current = filtersKey;
+
     const fetchProducts = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        // Debug: Log filters trước khi gọi API
-        console.log('📤 [useProductsWithFilters] Gọi API với filters:', filters);
-        
+
         const data = await productService.getAll(filters);
-        
-        // Debug: Log response từ API
-        console.log('📥 [useProductsWithFilters] Response từ API:', {
-          count: data.length,
-          data: data,
+
+        setProducts(data.items ?? []);
+        setPagination({
+          page: data.page,
+          pageSize: data.pageSize,
+          totalCount: data.totalCount,
+          totalPages: data.totalPages,
+          hasNextPage: data.hasNextPage,
+          hasPreviousPage: data.hasPreviousPage,
         });
-        
-        setProducts(data);
       } catch (err) {
-        const error = err instanceof Error 
-          ? err 
+        const error = err instanceof Error
+          ? err
           : new Error('Failed to fetch products');
-        
-        // Debug: Log error
-        console.error('❌ [useProductsWithFilters] Error:', error);
-        
         setError(error);
         setProducts([]);
       } finally {
@@ -48,7 +67,8 @@ export function useProductsWithFilters(filters?: ProductFilters) {
     };
 
     fetchProducts();
-  }, [filters]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey]);
 
-  return { products, loading, error };
+  return { products, loading, error, pagination };
 }

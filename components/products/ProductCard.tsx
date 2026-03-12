@@ -14,11 +14,11 @@ interface ProductCardProps {
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
-  const finalPrice = product.discountPrice ?? product.price;
-  const hasDiscount = product.discountPrice !== null && product.discountPrice < product.price;
-  const discountPercent = hasDiscount
-    ? Math.round(((product.price - product.discountPrice!) / product.price) * 100)
-    : 0;
+  const hasDiscount = product.discountPercent !== null && product.discountPercent > 0;
+  const discountPercent = product.discountPercent ?? 0;
+  const finalPrice = hasDiscount
+    ? Math.round(product.price * (1 - discountPercent / 100))
+    : product.price;
 
   // Sử dụng images từ product object (đã có sẵn từ API Get All Products)
   const images = product.images || [];

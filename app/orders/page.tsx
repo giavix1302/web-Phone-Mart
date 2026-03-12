@@ -14,7 +14,7 @@ import Card from '@/components/ui/Card';
 import OrderCard from '@/components/orders/OrderCard';
 import { useAuth } from '@/hooks/use-auth';
 import { orderService } from '@/services/order.service';
-import { ShoppingBagIcon, HomeIcon } from '@heroicons/react/24/outline';
+import { ShoppingBagIcon, HomeIcon, ChevronLeftIcon, ChevronRightIcon as ChevronRightOutline } from '@heroicons/react/24/outline';
 import { ChevronRightIcon } from '@heroicons/react/24/solid';
 import type { OrderSummary } from '@/types/order';
 
@@ -26,6 +26,12 @@ export default function OrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  });
 
   // Check for success message from checkout
   useEffect(() => {
@@ -53,9 +59,14 @@ export default function OrdersPage() {
     setError(null);
 
     orderService
-      .getMyOrders()
-      .then((ordersData) => {
-        setOrders(ordersData);
+      .getMyOrders(currentPage)
+      .then((data) => {
+        setOrders(data.items);
+        setPagination({
+          totalPages: data.totalPages,
+          hasNextPage: data.hasNextPage,
+          hasPreviousPage: data.hasPreviousPage,
+        });
       })
       .catch((err) => {
         const error = err instanceof Error ? err : new Error('Failed to fetch orders');
@@ -65,7 +76,7 @@ export default function OrdersPage() {
       .finally(() => {
         setIsLoading(false);
       });
-  }, [isAuthenticated]);
+  }, [isAuthenticated, currentPage]);
 
   // Show loading or redirect if not ready
   if (authLoading || !isAuthenticated) {
@@ -128,9 +139,14 @@ export default function OrdersPage() {
                 onClick={() => {
                   setIsLoading(true);
                   orderService
-                    .getMyOrders()
-                    .then((ordersData) => {
-                      setOrders(ordersData);
+                    .getMyOrders(currentPage)
+                    .then((data) => {
+                      setOrders(data.items);
+                      setPagination({
+                        totalPages: data.totalPages,
+                        hasNextPage: data.hasNextPage,
+                        hasPreviousPage: data.hasPreviousPage,
+                      });
                       setError(null);
                     })
                     .catch((err) => {
@@ -168,11 +184,61 @@ export default function OrdersPage() {
 
           {/* Orders List */}
           {!isLoading && !error && orders.length > 0 && (
-            <div className="space-y-4">
-              {orders.map((order) => (
-                <OrderCard key={order.id} order={order} />
-              ))}
-            </div>
+            <>
+              <div className="space-y-4">
+                {orders.map((order) => (
+                  <OrderCard key={order.id} order={order} />
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {pagination.totalPages > 1 && (
+                <div className="mt-8 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => p - 1)}
+                    disabled={!pagination.hasPreviousPage}
+                    className="p-2 rounded-lg border border-gray-300 hover:border-[#FF4F00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Trang trước"
+                  >
+                    <ChevronLeftIcon className="w-5 h-5" />
+                  </button>
+
+                  {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                    .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - currentPage) <= 2)
+                    .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, idx) =>
+                      p === '...' ? (
+                        <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setCurrentPage(p as number)}
+                          className={`w-10 h-10 rounded-lg border text-sm font-medium transition-colors ${
+                            p === currentPage
+                              ? 'border-[#FF4F00] bg-[#FF4F00] text-white'
+                              : 'border-gray-300 hover:border-[#FF4F00] text-gray-700'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+
+                  <button
+                    onClick={() => setCurrentPage((p) => p + 1)}
+                    disabled={!pagination.hasNextPage}
+                    className="p-2 rounded-lg border border-gray-300 hover:border-[#FF4F00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    aria-label="Trang sau"
+                  >
+                    <ChevronRightOutline className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

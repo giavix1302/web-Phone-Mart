@@ -7,7 +7,10 @@
 
 import { useState } from 'react';
 import { ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { toast } from 'sonner';
+import { useAuth } from '@/hooks/use-auth';
 import { useCart } from '@/hooks/use-cart';
+
 import type { Product } from '@/types/api';
 
 interface ProductInfoProps {
@@ -16,33 +19,36 @@ interface ProductInfoProps {
 
 export default function ProductInfo({ product }: ProductInfoProps) {
   const { addToCart, isLoading } = useCart();
+  const { isAuthenticated } = useAuth();
   const [selectedColorId, setSelectedColorId] = useState<number | undefined>(undefined);
   const [isAdding, setIsAdding] = useState(false);
 
-  const finalPrice = product.discountPrice ?? product.price;
-  const hasDiscount = product.discountPrice !== null && product.discountPrice < product.price;
-  const discountPercent = hasDiscount
-    ? Math.round(((product.price - product.discountPrice!) / product.price) * 100)
-    : 0;
+  const hasDiscount = product.discountPercent !== null && product.discountPercent > 0;
+  const discountPercent = product.discountPercent ?? 0;
+  const finalPrice = hasDiscount
+    ? Math.round(product.price * (1 - discountPercent / 100))
+    : product.price;
 
   const hasColors = product.colors && product.colors.length > 0;
   const isColorRequired = hasColors && selectedColorId === undefined;
 
   const handleAddToCart = async () => {
-    // Validate color selection
+    if (!isAuthenticated) {
+      toast.error('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng');
+      return;
+    }
+
     if (hasColors && !selectedColorId) {
-      alert('Vui lòng chọn màu sắc trước khi thêm vào giỏ hàng');
+      toast.warning('Vui lòng chọn màu sắc trước khi thêm vào giỏ hàng');
       return;
     }
 
     setIsAdding(true);
     try {
       await addToCart(product.id, selectedColorId, 1);
-      // Show success message (you can replace with a toast notification)
-      alert('Đã thêm sản phẩm vào giỏ hàng!');
+      toast.success('Đã thêm sản phẩm vào giỏ hàng!');
     } catch (error) {
-      console.error('Failed to add to cart:', error);
-      alert('Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại.');
+      toast.error('Không thể thêm sản phẩm vào giỏ hàng. Vui lòng thử lại.');
     } finally {
       setIsAdding(false);
     }

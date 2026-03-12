@@ -9,17 +9,19 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import Card from '@/components/ui/Card';
 import { useAuth } from '@/hooks/use-auth';
 import { userService } from '@/services/user.service';
+import { authService } from '@/services/auth.service';
 import { reviewService } from '@/services/review.service';
 import { useMyReviews } from '@/hooks/use-my-reviews';
 import ReviewCard from '@/components/reviews/ReviewCard';
 import EditReviewModal from '@/components/reviews/EditReviewModal';
 import Pagination from '@/components/reviews/Pagination';
-import { HomeIcon, CameraIcon } from '@heroicons/react/24/outline';
+import { HomeIcon, CameraIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 import { ChevronRightIcon } from '@heroicons/react/24/solid';
 import type { UserProfile, UpdateProfileRequest } from '@/types/auth';
 import type { Review } from '@/types/api';
@@ -31,8 +33,6 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -48,6 +48,16 @@ export default function ProfilePage() {
   const [address, setAddress] = useState('');
   const [note, setNote] = useState('');
 
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordValidationErrors, setPasswordValidationErrors] = useState<Record<string, string>>({});
+
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -60,7 +70,6 @@ export default function ProfilePage() {
     if (!isAuthenticated) return;
 
     setIsLoading(true);
-    setError(null);
 
     userService
       .getMyProfile()
@@ -72,14 +81,43 @@ export default function ProfilePage() {
         setAvatarPreview(profileData.avatarUrl);
       })
       .catch((err) => {
-        const error = err instanceof Error ? err : new Error('Failed to fetch profile');
-        setError(error.message);
-        console.error('Error fetching profile:', error);
+        const msg = err instanceof Error ? err.message : 'Không thể tải thông tin tài khoản';
+        toast.error(msg);
       })
       .finally(() => {
         setIsLoading(false);
       });
   }, [isAuthenticated]);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const errors: Record<string, string> = {};
+    if (!currentPassword) errors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại';
+    if (!newPassword) errors.newPassword = 'Vui lòng nhập mật khẩu mới';
+    else if (newPassword.length < 6) errors.newPassword = 'Mật khẩu phải có ít nhất 6 ký tự';
+    if (!confirmPassword) errors.confirmPassword = 'Vui lòng xác nhận mật khẩu mới';
+    else if (newPassword !== confirmPassword) errors.confirmPassword = 'Mật khẩu xác nhận không khớp';
+
+    if (Object.keys(errors).length > 0) {
+      setPasswordValidationErrors(errors);
+      return;
+    }
+    setPasswordValidationErrors({});
+    setIsChangingPassword(true);
+
+    try {
+      await authService.changePassword({ currentPassword, newPassword });
+      toast.success('Đổi mật khẩu thành công!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      toast.error(err?.message || 'Mật khẩu hiện tại không đúng.');
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -100,12 +138,8 @@ export default function ProfilePage() {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccessMessage(null);
 
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsSaving(true);
 
@@ -117,17 +151,9 @@ export default function ProfilePage() {
 
       const updatedProfile = await userService.updateProfile(updateData);
       setProfile(updatedProfile);
-      setSuccessMessage('Cập nhật thông tin thành công!');
-      
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccessMessage(null), 3000);
+      toast.success('Cập nhật thông tin thành công!');
     } catch (err: any) {
-      console.error('Failed to update profile:', err);
-      if (err.statusCode === 400) {
-        setError(err.message || 'Dữ liệu không hợp lệ');
-      } else {
-        setError('Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
-      }
+      toast.error(err?.message || 'Có lỗi xảy ra khi cập nhật thông tin. Vui lòng thử lại.');
     } finally {
       setIsSaving(false);
     }
@@ -139,13 +165,13 @@ export default function ProfilePage() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError('File phải là hình ảnh');
+      toast.error('File phải là hình ảnh');
       return;
     }
 
     // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('Kích thước file không được vượt quá 5MB');
+      toast.error('Kích thước file không được vượt quá 5MB');
       return;
     }
 
@@ -156,21 +182,16 @@ export default function ProfilePage() {
     };
     reader.readAsDataURL(file);
 
-    // Upload avatar
     setIsUploadingAvatar(true);
-    setError(null);
 
     userService
       .updateAvatar(file)
       .then((updatedProfile) => {
         setProfile(updatedProfile);
-        setSuccessMessage('Cập nhật avatar thành công!');
-        setTimeout(() => setSuccessMessage(null), 3000);
+        toast.success('Cập nhật avatar thành công!');
       })
       .catch((err: any) => {
-        console.error('Failed to upload avatar:', err);
-        setError(err.message || 'Không thể upload avatar. Vui lòng thử lại.');
-        // Reset preview on error
+        toast.error(err?.message || 'Không thể upload avatar. Vui lòng thử lại.');
         setAvatarPreview(profile?.avatarUrl || null);
       })
       .finally(() => {
@@ -195,7 +216,7 @@ export default function ProfilePage() {
       await reviewService.deleteReview(reviewId);
       refetchReviews();
     } catch (err: any) {
-      alert(err?.message || 'Không thể xóa đánh giá. Vui lòng thử lại.');
+      toast.error(err?.message || 'Không thể xóa đánh giá. Vui lòng thử lại.');
     } finally {
       setIsDeleting(null);
     }
@@ -245,20 +266,6 @@ export default function ProfilePage() {
             </h1>
             <p className="text-gray-600">Quản lý thông tin cá nhân của bạn</p>
           </div>
-
-          {/* Success Message */}
-          {successMessage && (
-            <Card className="mb-6 p-4 bg-green-50 border-green-200">
-              <p className="text-green-700 font-semibold">{successMessage}</p>
-            </Card>
-          )}
-
-          {/* Error Message */}
-          {error && (
-            <Card className="mb-6 p-4 bg-red-50 border-red-200">
-              <p className="text-red-700 font-semibold">{error}</p>
-            </Card>
-          )}
 
           {isLoading ? (
             <div className="flex justify-center items-center py-20">
@@ -486,6 +493,119 @@ export default function ProfilePage() {
                   </div>
                 </Card>
               </div>
+            </div>
+
+            {/* Change Password Section */}
+            <div className="mt-6">
+              <Card>
+                <h2 className="text-xl font-bold text-[#333333] mb-4 flex items-center gap-2">
+                  <LockClosedIcon className="w-5 h-5" />
+                  Đổi mật khẩu
+                </h2>
+
+                <form onSubmit={handleChangePassword} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Current Password */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#333333] mb-2">
+                      Mật khẩu hiện tại <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={(e) => {
+                          setCurrentPassword(e.target.value);
+                          if (passwordValidationErrors.currentPassword) {
+                            setPasswordValidationErrors((prev) => { const n = { ...prev }; delete n.currentPassword; return n; });
+                          }
+                        }}
+                        placeholder="Mật khẩu hiện tại"
+                        disabled={isChangingPassword}
+                        className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] transition-all ${passwordValidationErrors.currentPassword ? 'border-red-500' : 'border-gray-300'}`}
+                      />
+                      <button type="button" onClick={() => setShowCurrentPassword(!showCurrentPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showCurrentPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {passwordValidationErrors.currentPassword && <p className="text-sm text-red-600 mt-1">{passwordValidationErrors.currentPassword}</p>}
+                  </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#333333] mb-2">
+                      Mật khẩu mới <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        value={newPassword}
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          if (passwordValidationErrors.newPassword) {
+                            setPasswordValidationErrors((prev) => { const n = { ...prev }; delete n.newPassword; return n; });
+                          }
+                        }}
+                        placeholder="Tối thiểu 6 ký tự"
+                        disabled={isChangingPassword}
+                        className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] transition-all ${passwordValidationErrors.newPassword ? 'border-red-500' : 'border-gray-300'}`}
+                      />
+                      <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showNewPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {passwordValidationErrors.newPassword && <p className="text-sm text-red-600 mt-1">{passwordValidationErrors.newPassword}</p>}
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-sm font-semibold text-[#333333] mb-2">
+                      Xác nhận mật khẩu <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <LockClosedIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => {
+                          setConfirmPassword(e.target.value);
+                          if (passwordValidationErrors.confirmPassword) {
+                            setPasswordValidationErrors((prev) => { const n = { ...prev }; delete n.confirmPassword; return n; });
+                          }
+                        }}
+                        placeholder="Nhập lại mật khẩu mới"
+                        disabled={isChangingPassword}
+                        className={`w-full pl-10 pr-12 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] transition-all ${passwordValidationErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
+                      />
+                      <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        {showConfirmPassword ? <EyeSlashIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                      </button>
+                    </div>
+                    {passwordValidationErrors.confirmPassword && <p className="text-sm text-red-600 mt-1">{passwordValidationErrors.confirmPassword}</p>}
+                  </div>
+
+                  {/* Submit — full width on mobile, auto on desktop */}
+                  <div className="md:col-span-3 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isChangingPassword}
+                      className={`flex items-center gap-2 px-8 py-3 rounded-lg font-semibold transition-colors ${
+                        isChangingPassword ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#FF4F00] text-white hover:bg-[#e64500]'
+                      }`}
+                    >
+                      {isChangingPassword ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                          <span>Đang cập nhật...</span>
+                        </>
+                      ) : (
+                        'Đổi mật khẩu'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </Card>
             </div>
 
             {/* My Reviews Section */}

@@ -58,6 +58,16 @@ export interface OrderSummary {
   itemCount: number;
 }
 
+export interface PaginatedOrderResponse {
+  items: OrderSummary[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 // Request types
 export interface CreateOrderRequest {
   shippingAddress: string;

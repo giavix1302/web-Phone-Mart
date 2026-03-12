@@ -1,83 +1,60 @@
-/**
- * CartItem Component
- * Hiển thị thông tin một item trong cart
- */
-
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { TrashIcon, MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { toast } from 'sonner';
 import { useCart } from '@/hooks/use-cart';
 import type { CartItem as CartItemType } from '@/types/cart';
 
 interface CartItemProps {
   item: CartItemType;
-  isLocalCart?: boolean; // Nếu true, item từ localStorage (chưa có đầy đủ thông tin)
   product?: {
     images?: Array<{ imageUrl: string; isPrimary: boolean }>;
-  } | null; // Product data để lấy hình ảnh
+    stockQuantity?: number;
+  } | null;
 }
 
-export default function CartItem({ item, isLocalCart = false, product }: CartItemProps) {
-  const {
-    updateCartItem,
-    updateLocalCartItem,
-    removeCartItem,
-    removeLocalCartItem,
-    isLoading,
-  } = useCart();
+export default function CartItem({ item, product }: CartItemProps) {
+  const { updateCartItem, removeCartItem, isLoading } = useCart();
   const [quantity, setQuantity] = useState(item.quantity);
   const [isUpdating, setIsUpdating] = useState(false);
 
+  const stockQuantity = product?.stockQuantity;
+  const [isAtStock, setIsAtStock] = useState(
+    stockQuantity !== undefined && item.quantity >= stockQuantity
+  );
+
   const handleQuantityChange = async (newQuantity: number) => {
-    if (newQuantity < 1) return;
-    if (newQuantity > 999) return; // Max quantity
-
-    setQuantity(newQuantity);
-
-    if (isLocalCart) {
-      // Update localStorage cart
-      updateLocalCartItem(item.productId, item.colorId ?? undefined, newQuantity);
+    if (newQuantity < 1 || newQuantity > 999) return;
+    if (stockQuantity !== undefined && newQuantity > stockQuantity) {
+      toast.error(`Chỉ còn ${stockQuantity} sản phẩm trong kho`);
+      setIsAtStock(true);
       return;
     }
 
+    setIsAtStock(stockQuantity !== undefined && newQuantity >= stockQuantity);
+    setQuantity(newQuantity);
     setIsUpdating(true);
     try {
       await updateCartItem(item.id, newQuantity);
     } catch (error) {
-      // Revert quantity on error
       setQuantity(item.quantity);
-      console.error('Failed to update quantity:', error);
+      toast.error('Không thể cập nhật số lượng. Vui lòng thử lại.');
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleRemove = async () => {
-    if (isLocalCart) {
-      // Remove from localStorage cart
-      removeLocalCartItem(item.productId, item.colorId ?? undefined);
-      return;
-    }
-
     try {
       await removeCartItem(item.id);
     } catch (error) {
-      console.error('Failed to remove item:', error);
+      toast.error('Không thể xóa sản phẩm. Vui lòng thử lại.');
     }
   };
 
-  const handleDecrease = () => {
-    handleQuantityChange(quantity - 1);
-  };
-
-  const handleIncrease = () => {
-    handleQuantityChange(quantity + 1);
-  };
-
-  // Get primary image from product data if available
   const primaryImage = product?.images
     ? (product.images.find((img) => img.isPrimary) || product.images[0])?.imageUrl
     : null;
@@ -148,7 +125,7 @@ export default function CartItem({ item, isLocalCart = false, product }: CartIte
           <div className="flex items-center gap-4 md:flex-col md:items-end">
             <div className="flex items-center gap-2 border border-gray-300 rounded-lg">
               <button
-                onClick={handleDecrease}
+                onClick={() => handleQuantityChange(quantity - 1)}
                 disabled={isUpdating || isLoading || quantity <= 1}
                 className="p-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Giảm số lượng"
@@ -168,8 +145,8 @@ export default function CartItem({ item, isLocalCart = false, product }: CartIte
                 className="w-16 text-center border-0 focus:outline-none focus:ring-0 disabled:bg-transparent"
               />
               <button
-                onClick={handleIncrease}
-                disabled={isUpdating || isLoading}
+                onClick={() => handleQuantityChange(quantity + 1)}
+                disabled={isUpdating || isLoading || isAtStock}
                 className="p-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Tăng số lượng"
               >

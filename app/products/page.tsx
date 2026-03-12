@@ -17,11 +17,10 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { useCategories } from '@/hooks/use-categories';
 import { useBrands } from '@/hooks/use-brands';
 import type { ProductFilters as ProductFiltersType } from '@/services/product.service';
-import { FunnelIcon, MagnifyingGlassIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { FunnelIcon, MagnifyingGlassIcon, ChevronDownIcon, XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
-  const [sortBy, setSortBy] = useState<'name' | 'price-asc' | 'price-desc'>('name');
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
   const priceButtonRef = useRef<HTMLButtonElement>(null);
   const priceModalRef = useRef<HTMLDivElement>(null);
@@ -52,40 +51,21 @@ export default function ProductsPage() {
 
   // Debounce tất cả filters 1 giây trước khi gọi API
   const debouncedFilters = useDebounce(filters, 1000);
+  const [isFiltering, setIsFiltering] = useState(false);
 
-  // Debug: Log filters trước khi gửi xuống backend
+  // Set isFiltering = true ngay khi filters thay đổi
   useEffect(() => {
-    console.log('🔍 [Products Page] Filters trước khi gửi xuống BE:', debouncedFilters);
+    setIsFiltering(true);
+  }, [filters]);
+
+  // Set isFiltering = false khi debounced filters bắt kịp
+  useEffect(() => {
+    setIsFiltering(false);
   }, [debouncedFilters]);
 
   // Gửi tất cả filters xuống backend (bao gồm cả minPrice và maxPrice)
-  const { products, loading, error } = useProductsWithFilters(debouncedFilters);
+  const { products, loading, error, pagination } = useProductsWithFilters(debouncedFilters);
 
-  // Debug: Log products sau khi nhận từ backend
-  useEffect(() => {
-    if (products.length > 0) {
-      console.log('✅ [Products Page] Products nhận từ BE:', {
-        count: products.length,
-        firstProduct: products[0],
-        allProducts: products,
-      });
-    }
-  }, [products]);
-
-  // Sort products
-  const sortedProducts = useMemo(() => {
-    return [...products].sort((a, b) => {
-      switch (sortBy) {
-        case 'price-asc':
-          return (a.discountPrice ?? a.price) - (b.discountPrice ?? b.price);
-        case 'price-desc':
-          return (b.discountPrice ?? b.price) - (a.discountPrice ?? a.price);
-        case 'name':
-        default:
-          return a.name.localeCompare(b.name);
-      }
-    });
-  }, [products, sortBy]);
 
   // Check if price filter is active
   const hasPriceFilter = filters.minPrice !== undefined || filters.maxPrice !== undefined;
@@ -282,29 +262,35 @@ export default function ProductsPage() {
                 </div>
 
                 {/* Clear Filters Button */}
-                {Object.keys(filters).length > 0 && (
-                  <button
-                    onClick={() => setFilters({})}
-                    className="px-4 py-2 text-sm text-[#FF4F00] hover:bg-[#FF4F00]/10 rounded-lg transition-colors font-medium"
-                  >
-                    Xóa bộ lọc
-                  </button>
-                )}
+                <button
+                  onClick={() => setFilters({})}
+                  disabled={Object.keys(filters).length === 0}
+                  className="px-4 py-2 text-sm rounded-lg transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed text-[#FF4F00] hover:bg-[#FF4F00]/10 disabled:hover:bg-transparent"
+                >
+                  Xóa bộ lọc
+                </button>
               </div>
 
               {/* Sort */}
               <div className="flex items-center gap-2 border-t lg:border-t-0 lg:border-l border-gray-200 pt-4 lg:pt-0 lg:pl-4">
                 <label className="text-sm text-gray-600 whitespace-nowrap">Sắp xếp:</label>
                 <select
-                  value={sortBy}
-                  onChange={(e) =>
-                    setSortBy(e.target.value as 'name' | 'price-asc' | 'price-desc')
-                  }
+                  value={`${filters.sortBy ?? 'createdAt'}-${filters.sortDir ?? 'desc'}`}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'price-asc') setFilters({ ...filters, sortBy: 'price', sortDir: 'asc' });
+                    else if (val === 'price-desc') setFilters({ ...filters, sortBy: 'price', sortDir: 'desc' });
+                    else if (val === 'name-asc') setFilters({ ...filters, sortBy: 'name', sortDir: 'asc' });
+                    else if (val === 'rating-desc') setFilters({ ...filters, sortBy: 'rating', sortDir: 'desc' });
+                    else setFilters({ ...filters, sortBy: 'createdAt', sortDir: 'desc' });
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF4F00] text-sm"
                 >
-                  <option value="name">Tên A-Z</option>
+                  <option value="createdAt-desc">Mới nhất</option>
+                  <option value="name-asc">Tên A-Z</option>
                   <option value="price-asc">Giá tăng dần</option>
                   <option value="price-desc">Giá giảm dần</option>
+                  <option value="rating-desc">Đánh giá cao nhất</option>
                 </select>
               </div>
             </div>
@@ -314,7 +300,7 @@ export default function ProductsPage() {
           <div className="relative">
 
               {/* Loading State - Initial load */}
-              {loading && sortedProducts.length === 0 && (
+              {loading && products.length === 0 && (
                 <div className="flex justify-center items-center py-20">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF4F00]"></div>
                 </div>
@@ -340,7 +326,7 @@ export default function ProductsPage() {
               )}
 
               {/* Empty State */}
-              {!loading && !error && sortedProducts.length === 0 && (
+              {!loading && !error && products.length === 0 && (
                 <div className="bg-white rounded-lg p-12 text-center">
                   <FunnelIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-gray-700 mb-2">
@@ -359,21 +345,69 @@ export default function ProductsPage() {
               )}
 
               {/* Products Grid */}
-              {!loading && !error && sortedProducts.length > 0 && (
+              {!loading && !error && products.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {sortedProducts.map((product) => (
+                  {products.map((product) => (
                     <ProductCard key={product.id} product={product} />
                   ))}
                 </div>
               )}
 
               {/* Loading overlay khi đang filter (có products cũ) */}
-              {loading && sortedProducts.length > 0 && (
+              {(loading || isFiltering) && products.length > 0 && (
                 <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF4F00]"></div>
                 </div>
               )}
           </div>
+
+          {/* Pagination */}
+          {!loading && !error && pagination.totalPages > 1 && (
+            <div className="mt-8 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setFilters({ ...filters, page: pagination.page - 1 })}
+                disabled={!pagination.hasPreviousPage}
+                className="p-2 rounded-lg border border-gray-300 hover:border-[#FF4F00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Trang trước"
+              >
+                <ChevronLeftIcon className="w-5 h-5" />
+              </button>
+
+              {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === pagination.totalPages || Math.abs(p - pagination.page) <= 2)
+                .reduce<(number | '...')[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, idx) =>
+                  p === '...' ? (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setFilters({ ...filters, page: p as number })}
+                      className={`w-10 h-10 rounded-lg border text-sm font-medium transition-colors ${
+                        p === pagination.page
+                          ? 'border-[#FF4F00] bg-[#FF4F00] text-white'
+                          : 'border-gray-300 hover:border-[#FF4F00] text-gray-700'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+
+              <button
+                onClick={() => setFilters({ ...filters, page: pagination.page + 1 })}
+                disabled={!pagination.hasNextPage}
+                className="p-2 rounded-lg border border-gray-300 hover:border-[#FF4F00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Trang sau"
+              >
+                <ChevronRightIcon className="w-5 h-5" />
+              </button>
+            </div>
+          )}
         </div>
       </main>
       <Footer />

@@ -5,59 +5,81 @@
 
 import { apiClient } from '@/lib/api-client';
 import { API_ENDPOINTS } from '@/constants/endpoints';
-import { API_CONFIG } from '@/config/api';
-import type { Product, ProductImage, ApiResponse, PaginatedResponse } from '@/types/api';
+import type { Product, ProductImage, ApiResponse, PaginatedProductResponse } from '@/types/api';
 
 export interface ProductFilters {
+  search?: string;
   brandId?: number;
   categoryId?: number;
   minPrice?: number;
   maxPrice?: number;
-  search?: string;
-  isActive?: boolean;
+  sortBy?: 'createdAt' | 'price' | 'name' | 'rating';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
 }
 
 export const productService = {
   /**
    * Lấy danh sách sản phẩm với filters
    */
-  getAll: async (filters?: ProductFilters): Promise<Product[]> => {
+  getAll: async (filters?: ProductFilters): Promise<PaginatedProductResponse> => {
     const params = new URLSearchParams();
-    
-    // Gửi tất cả filters xuống backend
+
+    if (filters?.search) params.append('search', filters.search);
     if (filters?.brandId) params.append('brandId', filters.brandId.toString());
     if (filters?.categoryId) params.append('categoryId', filters.categoryId.toString());
     if (filters?.minPrice) params.append('minPrice', filters.minPrice.toString());
     if (filters?.maxPrice) params.append('maxPrice', filters.maxPrice.toString());
-    if (filters?.search) params.append('search', filters.search);
-    if (filters?.isActive !== undefined) params.append('isActive', filters.isActive.toString());
+    if (filters?.sortBy) params.append('sortBy', filters.sortBy);
+    if (filters?.sortDir) params.append('sortDir', filters.sortDir);
+    if (filters?.page) params.append('page', filters.page.toString());
+    if (filters?.pageSize) params.append('pageSize', filters.pageSize.toString());
 
     const queryString = params.toString();
-    const endpoint = queryString 
+    const endpoint = queryString
       ? `${API_ENDPOINTS.PRODUCTS}?${queryString}`
       : API_ENDPOINTS.PRODUCTS;
 
-    // Debug: Log request details
-    console.log('🌐 [Product Service] Request details:', {
-      endpoint: endpoint,
-      fullUrl: `${API_CONFIG.BASE_URL}${endpoint}`,
-      filters: filters,
-      queryParams: Object.fromEntries(params.entries()),
+    const response = await apiClient.get<ApiResponse<PaginatedProductResponse>>(endpoint, {
+      public: true,
     });
 
-    const response = await apiClient.get<ApiResponse<Product[]>>(endpoint, {
-      public: true, // API public, không cần auth
-    });
+    console.log('[productService.getAll] raw response:', response);
 
-    // Debug: Log response details
-    console.log('📡 [Product Service] Response details:', {
-      success: response.success,
-      message: response.message,
-      dataCount: Array.isArray(response.data) ? response.data.length : 'not array',
-      data: response.data,
-    });
+    // API trả về { success, message, data: { items, totalCount, page, ... } }
+    const paginatedData = (response as ApiResponse<PaginatedProductResponse>).data;
 
-    return response.data;
+    console.log('[productService.getAll] paginatedData:', paginatedData);
+
+    if (paginatedData && Array.isArray(paginatedData.items)) {
+      return paginatedData;
+    }
+
+    // Fallback: nếu response là flat array
+    if (Array.isArray(response)) {
+      const items = response as unknown as Product[];
+      return {
+        items,
+        totalCount: items.length,
+        page: filters?.page ?? 1,
+        pageSize: filters?.pageSize ?? 20,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      };
+    }
+
+    console.warn('[productService.getAll] unexpected response format:', response);
+    return {
+      items: [],
+      totalCount: 0,
+      page: filters?.page ?? 1,
+      pageSize: filters?.pageSize ?? 20,
+      totalPages: 0,
+      hasNextPage: false,
+      hasPreviousPage: false,
+    };
   },
 
   /**

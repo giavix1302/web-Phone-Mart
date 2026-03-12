@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { useAuth } from '@/hooks/use-auth';
@@ -20,7 +21,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Redirect nếu đã đăng nhập
   useEffect(() => {
@@ -46,18 +46,14 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
 
     try {
       await login({ email, password });
-      // Redirect về trang trước hoặc trang chủ
       const returnUrl = new URLSearchParams(window.location.search).get('returnUrl') || '/';
       router.push(returnUrl);
     } catch (err: any) {
-      setError(
-        err?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.'
-      );
+      toast.error(err?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại email và mật khẩu.');
     } finally {
       setLoading(false);
     }
@@ -103,13 +99,6 @@ export default function LoginPage() {
             <p className="text-gray-600 text-center text-sm mb-8">
               Đăng nhập để tiếp tục mua sắm
             </p>
-
-            {/* Error Message */}
-            {error && (
-              <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
-              </div>
-            )}
 
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">

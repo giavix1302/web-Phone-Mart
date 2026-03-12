@@ -9,9 +9,10 @@ import type { ApiResponse } from '@/types/api';
 import type {
   Order,
   OrderSummary,
+  PaginatedOrderResponse,
   CreateOrderRequest,
+  OrderTracking,
 } from '@/types/order';
-import type { OrderTracking } from '@/types/order';
 
 export const orderService = {
   /**
@@ -25,10 +26,15 @@ export const orderService = {
   },
 
   /**
-   * Lấy danh sách đơn hàng của tôi
+   * Lấy danh sách đơn hàng của tôi (có phân trang)
    */
-  getMyOrders: async (): Promise<OrderSummary[]> => {
-    const response = await apiClient.get<ApiResponse<OrderSummary[]>>(API_ENDPOINTS.ORDERS_ME);
+  getMyOrders: async (page: number = 1, pageSize: number = 10): Promise<PaginatedOrderResponse> => {
+    const params = new URLSearchParams();
+    params.append('page', page.toString());
+    params.append('pageSize', pageSize.toString());
+    const response = await apiClient.get<ApiResponse<PaginatedOrderResponse>>(
+      `${API_ENDPOINTS.ORDERS_ME}?${params.toString()}`
+    );
     return response.data;
   },
 

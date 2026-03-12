@@ -6,6 +6,7 @@
 export const API_ENDPOINTS = {
   // Products
   PRODUCTS: '/products',
+  PRODUCTS_FEATURED: '/products/featured',
   PRODUCT_BY_ID: (id: string) => `/products/${id}`,
   PRODUCT_IMAGES: (productId: string | number) => `/products/${productId}/images`,
   PRODUCT_IMAGE_BY_ID: (productId: string | number, imageId: string | number) => `/products/${productId}/images/${imageId}`,
@@ -28,9 +29,14 @@ export const API_ENDPOINTS = {
   VERIFY_REGISTER_OTP: '/auth/verify-register-otp',
   LOGOUT: '/auth/logout',
   REFRESH_TOKEN: '/auth/refresh',
+  FORGOT_PASSWORD: '/auth/forgot-password',
+  VERIFY_FORGOT_PASSWORD_OTP: '/auth/verify-forgot-password-otp',
+  RESET_PASSWORD: '/auth/reset-password',
+  CHANGE_PASSWORD: '/users/me/change-password',
   
   // Reviews
   REVIEWS: '/reviews',
+  REVIEWS_TOP: '/reviews/top',
   REVIEW_BY_ID: (reviewId: string | number) => `/reviews/${reviewId}`,
   REVIEWS_ME: '/reviews/me',
   REVIEW_ME_BY_ID: (reviewId: string | number) => `/reviews/me/${reviewId}`,

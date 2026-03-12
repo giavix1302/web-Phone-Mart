@@ -13,6 +13,11 @@ import type {
   VerifyRegisterOtpRequest,
   VerifyRegisterOtpResponse,
   RefreshTokenResponse,
+  ForgotPasswordRequest,
+  VerifyForgotPasswordOtpRequest,
+  VerifyForgotPasswordOtpResponse,
+  ResetPasswordRequest,
+  ChangePasswordRequest,
   ApiResponse,
 } from '@/types/api';
 
@@ -87,6 +92,48 @@ export const authService = {
       // Luôn xóa token dù API có thành công hay không
       authStore.clearToken();
     }
+  },
+
+  /**
+   * Gửi OTP quên mật khẩu đến email
+   */
+  forgotPassword: async (data: ForgotPasswordRequest): Promise<void> => {
+    await apiClient.post<ApiResponse<null>>(API_ENDPOINTS.FORGOT_PASSWORD, {
+      body: data,
+      public: true,
+    });
+  },
+
+  /**
+   * Xác thực OTP quên mật khẩu → nhận resetToken
+   */
+  verifyForgotPasswordOtp: async (
+    data: VerifyForgotPasswordOtpRequest
+  ): Promise<string> => {
+    const response = await apiClient.post<ApiResponse<VerifyForgotPasswordOtpResponse>>(
+      API_ENDPOINTS.VERIFY_FORGOT_PASSWORD_OTP,
+      { body: data, public: true }
+    );
+    return response.data.resetToken;
+  },
+
+  /**
+   * Đặt lại mật khẩu bằng resetToken
+   */
+  resetPassword: async (data: ResetPasswordRequest): Promise<void> => {
+    await apiClient.post<ApiResponse<null>>(API_ENDPOINTS.RESET_PASSWORD, {
+      body: data,
+      public: true,
+    });
+  },
+
+  /**
+   * Đổi mật khẩu khi đã đăng nhập (cần Bearer token)
+   */
+  changePassword: async (data: ChangePasswordRequest): Promise<void> => {
+    await apiClient.post<ApiResponse<null>>(API_ENDPOINTS.CHANGE_PASSWORD, {
+      body: data,
+    });
   },
 
   /**

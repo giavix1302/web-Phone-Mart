@@ -29,6 +29,16 @@ export interface UpdateReviewData {
 
 export const reviewService = {
   /**
+   * Lấy top 10 reviews đánh giá cao nhất (Public)
+   */
+  getTopReviews: async (): Promise<Review[]> => {
+    const response = await apiClient.get<ApiResponse<Review[]>>(API_ENDPOINTS.REVIEWS_TOP, {
+      public: true,
+    });
+    return response.data;
+  },
+
+  /**
    * Lấy danh sách reviews của sản phẩm (Public)
    */
   getProductReviews: async (

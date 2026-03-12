@@ -254,7 +254,7 @@ export default function OrderDetailPage() {
                         className="flex gap-4 pb-4 border-b border-gray-200 last:border-0"
                       >
                         <Link
-                          href={`/products/${item.productSlug || item.productId}`}
+                          href={`/products/${item.productId}`}
                           className="flex-1"
                         >
                           <p className="font-semibold text-[#333333] hover:text-[#FF4F00] transition-colors">

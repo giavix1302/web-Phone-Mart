@@ -10,7 +10,7 @@ export interface Product {
   slug: string;
   description: string | null;
   price: number;
-  discountPrice: number | null;
+  discountPercent: number | null; // % giảm giá (0–99.99), null nếu không giảm
   stockQuantity: number;
   isActive: boolean;
   categoryId: number | null;
@@ -19,10 +19,20 @@ export interface Product {
   brandName: string | null;
   colors: ProductColor[];
   specifications: ProductSpecification[];
-  images: ProductImage[]; // Images đã có sẵn trong API Get All Products
-  averageRating: number; // Điểm đánh giá trung bình (0-5)
-  totalReviews: number; // Tổng số lượng review
+  images: ProductImage[];
+  averageRating: number;
+  totalReviews: number;
   createdAt: string;
+}
+
+export interface PaginatedProductResponse {
+  items: Product[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 
 export interface ProductColor {
@@ -49,6 +59,7 @@ export interface Category {
   id: number;
   name: string;
   description: string | null;
+  imageUrl: string | null;
   createdAt: string;
 }
 
@@ -56,6 +67,7 @@ export interface Brand {
   id: number;
   name: string;
   description: string | null;
+  imageUrl: string | null;
   createdAt: string;
 }
 
@@ -78,6 +90,31 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+// Auth request/response types
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface VerifyForgotPasswordOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export interface VerifyForgotPasswordOtpResponse {
+  resetToken: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  resetToken: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 // Review types
