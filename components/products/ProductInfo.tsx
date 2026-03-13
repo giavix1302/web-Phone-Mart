@@ -56,9 +56,20 @@ export default function ProductInfo({ product }: ProductInfoProps) {
 
   return (
     <div className="space-y-6">
-      {/* Brand */}
-      {product.brandName && (
-        <p className="text-sm text-gray-500 uppercase tracking-wide">{product.brandName}</p>
+      {/* Brand & Category chips */}
+      {(product.brandName || product.categoryName) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {product.brandName && (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-[#FF4F00]/10 text-[#FF4F00] border border-[#FF4F00]/20 uppercase tracking-wide">
+              {product.brandName}
+            </span>
+          )}
+          {product.categoryName && (
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+              {product.categoryName}
+            </span>
+          )}
+        </div>
       )}
 
       {/* Name */}

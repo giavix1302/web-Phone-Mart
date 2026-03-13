@@ -192,19 +192,12 @@ class ApiClient {
       // Nếu error đã có statusCode thì giữ nguyên
       if (error instanceof Error && 'statusCode' in error) {
         const errorWithStatusCode = error as Error & { statusCode: number };
-        console.error('API Request failed:', {
-          url,
-          statusCode: errorWithStatusCode.statusCode,
-          message: error.message,
-        });
+        console.error(`API Request failed: [${errorWithStatusCode.statusCode}] ${error.message} — ${url}`);
         throw error;
       }
       
       // Lỗi khác
-      console.error('API Request failed:', {
-        url,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      console.error(`API Request failed: ${error instanceof Error ? error.message : String(error)} — ${url}`);
       throw error;
     }
   }
